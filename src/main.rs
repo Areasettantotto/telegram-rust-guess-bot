@@ -1,3 +1,15 @@
+// telegram-bot-rust
+// -----------------
+// Minimal Telegram bot in Rust implementing a per-chat "guess the number" game.
+// Features:
+//  - /ping command (responds with "pong")
+//  - /gioco command to start/restart a guessing game (1..100, 5 attempts)
+//  - per-chat in-memory game state stored in a shared RwLock
+//  - uses teloxide for Telegram integration, tokio for async runtime, rand for RNG
+//
+// Author: Marco Busato
+//
+
 use std::{collections::HashMap, sync::Arc};
 
 use anyhow::Result;
@@ -6,14 +18,14 @@ use rand::Rng;
 use teloxide::prelude::*;
 use tokio::sync::RwLock;
 
-/// Stato della singola partita per una chat
+/// State of the single game for a chat
 #[derive(Clone, Debug)]
 struct GameState {
     target: i32,
     attempts_left: i32,
 }
 
-/// Stato applicazione condiviso
+/// Shared application state
 struct AppState {
     by_chat: HashMap<i64, GameState>,
 }
@@ -50,7 +62,7 @@ async fn handle_message(bot: &Bot, msg: &Message, state: SharedState) -> Result<
     if let Some(text) = msg.text() {
         let text = text.trim();
 
-        // Comandi semplici
+        // Simple commands
         if text.eq_ignore_ascii_case("/ping") {
             bot.send_message(msg.chat.id, "pong").await?;
             return Ok(());
@@ -72,7 +84,7 @@ async fn handle_message(bot: &Bot, msg: &Message, state: SharedState) -> Result<
             return Ok(());
         }
 
-        // Se messaggio non è comando, prova a interpretarlo come tentativo
+        // If the message is not a command, try to interpret it as a guess
         if let Ok(guess) = text.parse::<i32>() {
             let mut lock = state.write().await;
             let chat_id = msg.chat.id.0;
@@ -91,7 +103,7 @@ async fn handle_message(bot: &Bot, msg: &Message, state: SharedState) -> Result<
                 if guess == game.target {
                     bot.send_message(msg.chat.id, "✅ Esatto! Hai indovinato! Gioco resettato.")
                         .await?;
-                    // Reset partita
+                    // Reset game
                     *game = GameState {
                         target: rand_in_range(1, 100),
                         attempts_left: 5,
