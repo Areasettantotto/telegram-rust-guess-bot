@@ -29,6 +29,9 @@ struct GameState {
 struct AppState {
     // key: (chat_id, user_id)
     by_user: HashMap<(i64, u64), GameState>,
+    // language preferences
+    user_langs: HashMap<(i64, u64), Lang>,
+    chat_langs: HashMap<i64, Lang>,
 }
 
 type SharedState = Arc<RwLock<AppState>>;
@@ -137,6 +140,34 @@ fn msg_too_high(lang: Lang, attempts: i32) -> String {
     }
 }
 
+fn msg_lang_current(_lang: Lang, current: Lang) -> String {
+    match current {
+        Lang::En => "Current language: English (en)".to_string(),
+        Lang::It => "Lingua corrente: Italiano (it)".to_string(),
+    }
+}
+
+fn msg_lang_set_user(lang: Lang) -> String {
+    match lang {
+        Lang::En => "Your language preference was set.".to_string(),
+        Lang::It => "La tua lingua è stata impostata.".to_string(),
+    }
+}
+
+fn msg_lang_set_chat(lang: Lang) -> String {
+    match lang {
+        Lang::En => "Chat language preference was set.".to_string(),
+        Lang::It => "La lingua della chat è stata impostata.".to_string(),
+    }
+}
+
+fn msg_lang_invalid(lang: Lang) -> String {
+    match lang {
+        Lang::En => "Invalid usage. Examples: `/lang en`, `/lang it`, `/lang chat en`".to_string(),
+        Lang::It => "Uso non valido. Esempi: `/lang en`, `/lang it`, `/lang chat en`".to_string(),
+    }
+}
+
 #[tokio::main]
 async fn main() -> Result<()> {
     tracing_subscriber::fmt::init();
@@ -189,6 +220,8 @@ async fn main() -> Result<()> {
     }
     let state = Arc::new(RwLock::new(AppState {
         by_user: HashMap::new(),
+        user_langs: HashMap::new(),
+        chat_langs: HashMap::new(),
     }));
 
     teloxide::repl(bot, move |bot: Bot, msg: Message| {
@@ -212,6 +245,26 @@ async fn handle_message(
     state: SharedState,
     config: SharedConfig,
 ) -> Result<()> {
+    // Determine effective language for this message (user override -> chat override -> default)
+    let lang = {
+        // helper to compute effective lang
+        async fn effective_lang(state: &SharedState, msg: &Message, default: Lang) -> Lang {
+            let chat_id = msg.chat.id.0;
+            let lock = state.read().await;
+            if let Some(user) = msg.from.as_ref() {
+                let key = (chat_id, user.id.0);
+                if let Some(&l) = lock.user_langs.get(&key) {
+                    return l;
+                }
+            }
+            if let Some(&l) = lock.chat_langs.get(&chat_id) {
+                return l;
+            }
+            default
+        }
+
+        effective_lang(&state, msg, config.lang).await
+    };
     if let Some(text) = msg.text() {
         let text = text.trim();
 
@@ -245,6 +298,56 @@ async fn handle_message(
             let text =
                 msg_game_started(config.lang, config.min, config.max, new_game.attempts_left);
             bot.send_message(msg.chat.id, text).await?;
+            return Ok(());
+        }
+
+        // Language command: /lang [chat] <en|it>
+        if text.to_lowercase().starts_with("/lang") {
+            let parts: Vec<&str> = text.split_whitespace().collect();
+            let mut lock = state.write().await;
+
+            // helper to parse language token
+            let parse_lang = |s: &str| {
+                if s.eq_ignore_ascii_case("it") {
+                    Some(Lang::It)
+                } else if s.eq_ignore_ascii_case("en") {
+                    Some(Lang::En)
+                } else {
+                    None
+                }
+            };
+
+            if parts.len() == 1 {
+                // show effective language
+                bot.send_message(msg.chat.id, msg_lang_current(lang, lang))
+                    .await?;
+                return Ok(());
+            } else if parts.len() == 2 {
+                if let Some(new_lang) = parse_lang(parts[1]) {
+                    if let Some(user) = msg.from.as_ref() {
+                        let key = (msg.chat.id.0, user.id.0);
+                        lock.user_langs.insert(key, new_lang);
+                        bot.send_message(msg.chat.id, msg_lang_set_user(new_lang))
+                            .await?;
+                        return Ok(());
+                    } else {
+                        bot.send_message(msg.chat.id, msg_cannot_start(lang))
+                            .await?;
+                        return Ok(());
+                    }
+                }
+            } else if parts.len() == 3 && parts[1].eq_ignore_ascii_case("chat") {
+                if let Some(new_lang) = parse_lang(parts[2]) {
+                    // set chat-level language (affects all users in this chat)
+                    lock.chat_langs.insert(msg.chat.id.0, new_lang);
+                    bot.send_message(msg.chat.id, msg_lang_set_chat(new_lang))
+                        .await?;
+                    return Ok(());
+                }
+            }
+
+            bot.send_message(msg.chat.id, msg_lang_invalid(lang))
+                .await?;
             return Ok(());
         }
 

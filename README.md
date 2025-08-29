@@ -55,6 +55,8 @@ Supported commands (in chat with the bot):
 - `/gioco` — starts (or restarts) the game: starts a personal game for the user, the bot chooses a number in the configured range and gives you the configured number of attempts; send numbers to guess.
 - `/config` — shows the current game configuration (GAME_MIN, GAME_MAX, GAME_ATTEMPTS)
 
+- `/lang` — manage language preferences (per-user or per-chat). Examples below.
+
 ## Debug & troubleshooting
 - If you get a panic on startup: ensure `TELOXIDE_TOKEN` is set (`echo $TELOXIDE_TOKEN` or `cat .env`).
 - For detailed stack traces:
@@ -82,6 +84,20 @@ DEFAULT_LANG=en
 ```
 
 This affects the phrasing of replies such as the welcome prompt, hints after guesses, and configuration output.
+
+### /lang command
+The `/lang` command lets users control language preferences.
+
+Usage examples:
+
+- `/lang en` — sets your personal language to English (applies to you in the current chat).
+- `/lang it` — sets your personal language to Italian.
+- `/lang chat en` — sets the default language for the whole chat to English (affects every user in that chat unless they set a personal override).
+- `/lang` — shows the effective language for the current user in this chat.
+
+Notes:
+- Per-user preferences take precedence over the chat default.
+- Any user can set their own language. Changing the chat language affects everyone in the chat.
 
 ## Structure & logic
 - Game state is kept in-memory per user per chat in `SharedState` (non-persistent).
