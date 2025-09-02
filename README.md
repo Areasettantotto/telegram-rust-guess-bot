@@ -118,3 +118,44 @@ If you want, I can also add a `LICENSE` (MIT) and a `.gitignore` tailored for Ru
 ---
 
 README updated to reflect new `.env` options: `GAME_MIN`, `GAME_MAX`, `GAME_ATTEMPTS`.
+
+## Deploy via SSH
+
+Practical example for deploying on a remote server via SSH:
+
+- Connect to the server:
+
+```bash
+ssh root@your_ip
+```
+
+- Go to the bot directory and update the repository:
+
+```bash
+cd /opt/telegram-bot
+git pull origin master
+```
+
+- Make the deploy script executable (if it isn't already) and run it:
+
+```bash
+chmod +x deploy-bot.sh
+./deploy-bot.sh
+```
+
+Typical script output shows that changes are pulled, the `release` profile is built, and the systemd service is restarted:
+
+```
+⬇️  Pulling latest changes from GitHub...
+⚙️  Building bot...
+  Finished `release` profile [optimized] target(s) in 0.13s
+🔄 Restarting systemd service...
+📡 Bot status:
+✅ Bot active and running
+```
+
+Useful notes:
+- Make sure the server has a `TELOXIDE_TOKEN` environment variable or a `.env` file with the bot token.
+- The script assumes a systemd service is already set up to manage the bot process; the service name may vary (e.g. `telegram-bot.service`).
+- If your repo's main branch is `main`, use `git pull origin main`.
+
