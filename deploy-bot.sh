@@ -8,7 +8,7 @@ cd /opt/telegram-bot || { echo "❌ Cartella /opt/telegram-bot non trovata"; exi
 
 # Aggiorna il codice dal repository
 echo "⬇️  Pulling latest changes from GitHub..."
-git pull origin main || { echo "❌ Errore in git pull"; exit 1; }
+git pull origin master || { echo "❌ Errore in git pull"; exit 1; }
 
 # Compila il bot in modalità release
 echo "⚙️  Building bot..."
