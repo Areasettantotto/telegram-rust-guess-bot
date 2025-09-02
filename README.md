@@ -74,6 +74,43 @@ cargo fmt
 cargo clippy
 ```
 
+## Running tests
+
+This repository includes both unit and integration tests. The integration tests live under the `tests/` directory and import the library in `src/lib.rs`.
+
+Run the full test suite with:
+
+```bash
+cargo test
+```
+
+Run only the integration tests:
+
+```bash
+cargo test --test lang_and_rand
+```
+
+Notes:
+- Tests require no external services (they use the library types directly).
+- If you add tests that call `run_bot()` or interact with Telegram you should mock or stub network interactions to avoid hitting the real API during CI.
+- To run a single test function, use `cargo test <test_name>`.
+
+Unit vs integration tests
+
+- Run library unit tests (tests inside `src/` with `#[cfg(test)]`):
+
+```bash
+cargo test --lib
+```
+
+- Run a specific integration test file under `tests/` (example `lang_and_rand`):
+
+```bash
+cargo test --test lang_and_rand
+```
+
+These commands let you execute only the unit tests or only the named integration test without running the entire suite.
+
 - If the bot does not respond in groups, check the bot privacy settings in @BotFather (Privacy Mode).
 
 ## Language

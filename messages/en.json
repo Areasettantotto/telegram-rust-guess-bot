@@ -1,0 +1,16 @@
+{
+  "cannot_start": "I can't start a game for channels or messages without a user.",
+  "cannot_guess": "I can't handle guesses without a user.",
+  "game_started": "🎯 Game started for you! Guess a number between {min} and {max}. Attempts left: {attempts}\n",
+  "config": "Current configuration: min = {min}, max = {max}, attempts = {attempts}",
+  "welcome_prompt": "Hi {name}! Use /gioco to start your personal game.",
+  "no_attempts": "No attempts left. Use /gioco to restart.",
+  "revealed": "❌ You've run out of attempts. The number was {target}. Use /gioco to restart.",
+  "too_low": "Too low. Attempts left: {attempts}",
+  "too_high": "Too high. Attempts left: {attempts}",
+  "lang_set_user": "Your language preference was set.",
+  "lang_set_chat": "Chat language preference was set.",
+  "lang_invalid": "Invalid usage. Examples: `/lang en`, `/lang it`, `/lang chat en`",
+  "pong": "pong",
+  "not_started_prompt": "You don't have an active game yet. Use /gioco to start."
+}
