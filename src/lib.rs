@@ -2,7 +2,7 @@ use anyhow::Result;
 use dotenvy::dotenv;
 use rand::{Rng, distributions::Uniform};
 use serde::Deserialize;
-use std::{collections::HashMap, env, fs, sync::Arc};
+use std::{collections::HashMap, env, fs, path::Path, sync::Arc};
 use teloxide::prelude::*;
 use tokio::sync::RwLock;
 
@@ -31,8 +31,7 @@ pub struct Config {
     pub max: i32,
     pub attempts: i32,
     pub lang: Lang,
-    pub messages_en: Messages,
-    pub messages_it: Messages,
+    pub messages: HashMap<Lang, Messages>,
 }
 
 pub type SharedConfig = Arc<Config>;
@@ -103,7 +102,38 @@ pub fn default_messages(lang: Lang) -> Messages {
             pong: "pong".to_string(),
             not_started_prompt: "Non hai ancora una partita attiva. Usa /gioco per iniziare.".to_string(),
         },
+        Lang::Ar => {
+            // Provide English defaults for languages that don't have bespoke defaults here
+            default_messages(Lang::En)
+        }
+        Lang::Ru => default_messages(Lang::En),
+        Lang::Zh => default_messages(Lang::En),
     }
+}
+
+/// Load every `*.json` file from the `messages/` directory and return a map
+/// from language tag (Lang) to parsed `Messages` value. Files which fail to
+/// parse will fall back to defaults for that language.
+pub fn load_all_messages(dir: &str) -> HashMap<Lang, Messages> {
+    let mut map = HashMap::new();
+    let p = Path::new(dir);
+    if let Ok(entries) = p.read_dir() {
+        for entry in entries.flatten() {
+            if let Ok(fname) = entry.file_name().into_string() {
+                if fname.to_lowercase().ends_with(".json") {
+                    let stem = fname.trim_end_matches(".json");
+                    if let Some(lang) = parse_lang(stem) {
+                        let path = format!("{}/{}", dir, fname);
+                        let msgs = load_messages_file(&path, lang);
+                        map.insert(lang, msgs);
+                    } else {
+                        tracing::warn!("skipping unknown language file: {}", fname);
+                    }
+                }
+            }
+        }
+    }
+    map
 }
 
 pub fn format_with(template: &str, pairs: &[(&str, &str)]) -> String {
@@ -114,20 +144,24 @@ pub fn format_with(template: &str, pairs: &[(&str, &str)]) -> String {
     s
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum Lang {
     En,
     It,
+    Ar,
+    Ru,
+    Zh,
 }
 
 /// Parse a short language tag into `Lang`.
 pub fn parse_lang(s: &str) -> Option<Lang> {
-    if s.eq_ignore_ascii_case("it") {
-        Some(Lang::It)
-    } else if s.eq_ignore_ascii_case("en") {
-        Some(Lang::En)
-    } else {
-        None
+    match s.to_lowercase().as_str() {
+        "it" => Some(Lang::It),
+        "en" => Some(Lang::En),
+        "ar" => Some(Lang::Ar),
+        "ru" => Some(Lang::Ru),
+        "zh" => Some(Lang::Zh),
+        _ => None,
     }
 }
 
@@ -160,10 +194,13 @@ async fn handle_message(
     config: SharedConfig,
 ) -> Result<()> {
     let lang = effective_lang(&state, msg, config.lang).await;
-    let messages = match lang {
-        Lang::En => &config.messages_en,
-        Lang::It => &config.messages_it,
-    };
+    // pick messages by language from the map, fall back to config.lang then to English
+    let messages = config
+        .messages
+        .get(&lang)
+        .or_else(|| config.messages.get(&config.lang))
+        .or_else(|| config.messages.get(&Lang::En))
+        .expect("there should always be at least English messages available");
 
     if let Some(text) = msg.text() {
         let text = text.trim();
@@ -207,6 +244,9 @@ async fn handle_message(
                 let current = match lang {
                     Lang::En => "Current language: English (en)",
                     Lang::It => "Lingua corrente: Italiano (it)",
+                    Lang::Ar => "اللغة الحالية: العربية (ar)",
+                    Lang::Ru => "Текущий язык: русский (ru)",
+                    Lang::Zh => "当前语言：中文 (zh)",
                 };
                 bot.send_message(msg.chat.id, current).await?;
                 return Ok(());
@@ -287,6 +327,9 @@ async fn handle_message(
                     let success = match lang {
                         Lang::En => "✅ Correct! You guessed it. Game reset.".to_string(),
                         Lang::It => "✅ Esatto! Hai indovinato! Gioco resettato.".to_string(),
+                        Lang::Ar => "✅ تم! لقد خمّنت الرقم. اللعبة أعيدت.".to_string(),
+                        Lang::Ru => "✅ Верно! Вы угадали. Игра сброшена.".to_string(),
+                        Lang::Zh => "✅ 正确！你猜对了。游戏已重置。".to_string(),
                     };
                     bot.send_message(msg.chat.id, success).await?;
                     *game = GameState {
@@ -340,7 +383,7 @@ pub async fn run_bot() -> Result<()> {
         Lang::En
     };
 
-    let cfg = Config {
+    let mut cfg = Config {
         min: env::var("GAME_MIN")
             .ok()
             .and_then(|v| v.parse().ok())
@@ -354,9 +397,16 @@ pub async fn run_bot() -> Result<()> {
             .and_then(|v| v.parse().ok())
             .unwrap_or(5),
         lang: default_lang,
-        messages_en: load_messages_file("messages/en.json", Lang::En),
-        messages_it: load_messages_file("messages/it.json", Lang::It),
+        messages: load_all_messages("messages"),
     };
+    // Ensure at least English messages exist as a fallback
+    if !cfg.messages.contains_key(&Lang::En) {
+        cfg.messages.insert(Lang::En, load_messages_file("messages/en.json", Lang::En));
+    }
+    // Ensure default language exists in the map; if not, insert fallback
+    if !cfg.messages.contains_key(&cfg.lang) {
+        cfg.messages.insert(cfg.lang, cfg.messages.get(&Lang::En).unwrap().clone());
+    }
     let shared_config = Arc::new(cfg);
 
     if shared_config.min >= shared_config.max {

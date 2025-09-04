@@ -124,6 +124,25 @@ DEFAULT_LANG=en
 
 This affects the phrasing of replies such as the welcome prompt, hints after guesses, and configuration output.
 
+### Adding languages
+
+You can add more languages by placing a JSON file in the `messages/` directory. The loader maps the file name (the file stem) to the language tag the bot understands. For example:
+
+- `messages/en.json` -> `en`
+- `messages/it.json` -> `it`
+- `messages/ar.json` -> `ar`
+- `messages/ru.json` -> `ru`
+- `messages/zh.json` -> `zh`
+
+Rules and notes:
+
+- Use the file stem as the language tag (lowercase). The code calls `parse_lang(stem)` to recognize the tag.
+- Files must be valid JSON matching the shape of the existing `messages/*.json` files (keys like `game_started`, `too_low`, `lang_set_user`, etc.).
+- On startup the bot loads every `*.json` file under `messages/`. If a file fails to parse or is missing, the bot falls back to default messages (English).
+- To add a new language not currently recognized by `parse_lang`, either add the corresponding variant in the code or use the existing supported tags. If you prefer fully dynamic tags, we can refactor to key the map by string tags instead of an enum.
+
+After adding or updating files, restart the bot to pick up the new languages. Users can then set their language with `/lang <tag>` (for example `/lang ru`).
+
 ### /lang command
 The `/lang` command lets users control language preferences.
 

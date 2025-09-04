@@ -1,0 +1,16 @@
+{
+  "cannot_start": "无法为频道或没有用户信息的消息启动游戏。",
+  "cannot_guess": "没有用户信息，无法处理猜测。",
+  "game_started": "🎯 游戏开始！请猜一个介于 {min} 与 {max} 之间的数字。剩余尝试次数：{attempts}\n",
+  "config": "当前配置：min = {min}, max = {max}, attempts = {attempts}",
+  "welcome_prompt": "嗨 {name}！使用 /gioco 开始你的个人游戏。",
+  "no_attempts": "没有剩余尝试次数。使用 /gioco 重新开始。",
+  "revealed": "❌ 你已用尽所有尝试。正确数字是 {target}。使用 /gioco 重新开始。",
+  "too_low": "太低。剩余尝试次数：{attempts}",
+  "too_high": "太高。剩余尝试次数：{attempts}",
+  "lang_set_user": "已设置你的语言偏好。",
+  "lang_set_chat": "已设置本聊天的语言。",
+  "lang_invalid": "用法无效。示例：`/lang en`、`/lang it`、`/lang chat en`",
+  "pong": "pong",
+  "not_started_prompt": "你还没有进行中的游戏。使用 /gioco 开"
+}
