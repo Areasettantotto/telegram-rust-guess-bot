@@ -24,6 +24,10 @@ fn messages_dir_loads_all_known_languages() {
     let map = load_all_messages("messages");
 
     for lang in expected {
-        assert!(map.contains_key(&lang), "messages map missing language: {:?}", lang);
+        assert!(
+            map.contains_key(&lang),
+            "messages map missing language: {:?}",
+            lang
+        );
     }
 }

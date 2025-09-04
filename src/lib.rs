@@ -401,11 +401,13 @@ pub async fn run_bot() -> Result<()> {
     };
     // Ensure at least English messages exist as a fallback
     if !cfg.messages.contains_key(&Lang::En) {
-        cfg.messages.insert(Lang::En, load_messages_file("messages/en.json", Lang::En));
+        cfg.messages
+            .insert(Lang::En, load_messages_file("messages/en.json", Lang::En));
     }
     // Ensure default language exists in the map; if not, insert fallback
     if !cfg.messages.contains_key(&cfg.lang) {
-        cfg.messages.insert(cfg.lang, cfg.messages.get(&Lang::En).unwrap().clone());
+        cfg.messages
+            .insert(cfg.lang, cfg.messages.get(&Lang::En).unwrap().clone());
     }
     let shared_config = Arc::new(cfg);
 
