@@ -168,7 +168,7 @@ pub fn rand_in_range(min: i32, max: i32) -> i32 {
     rng.sample(distr)
 }
 
-async fn effective_lang(state: &SharedState, msg: &Message, default: Lang) -> Lang {
+pub async fn effective_lang(state: &SharedState, msg: &Message, default: Lang) -> Lang {
     let chat_id = msg.chat.id.0;
     let lock = state.read().await;
     if let Some(user) = msg.from.as_ref() {
@@ -179,6 +179,56 @@ async fn effective_lang(state: &SharedState, msg: &Message, default: Lang) -> La
     }
     if let Some(&l) = lock.chat_langs.get(&chat_id) {
         return l;
+    }
+    // If the Telegram user provided a language_code, try to respect it for new users
+    if let Some(user) = msg.from.as_ref() {
+        if let Some(lang_code) = user.language_code.as_ref() {
+            // parse_lang expects short tags like "en", "it", etc.
+            if let Some(parsed) = parse_lang(lang_code) {
+                return parsed;
+            }
+            // sometimes language_code can be full locale like "en-US"; try prefix
+            if lang_code.len() >= 2 {
+                let prefix = &lang_code[..2];
+                if let Some(parsed) = parse_lang(prefix) {
+                    return parsed;
+                }
+            }
+        }
+    }
+
+    default
+}
+
+/// Test helper: determine effective language given simple parts (used by tests)
+pub async fn effective_lang_from_parts(
+    state: &SharedState,
+    user_language_code: Option<&str>,
+    user_id: Option<u64>,
+    chat_id: i64,
+    default: Lang,
+) -> Lang {
+    let lock = state.read().await;
+    if let Some(uid) = user_id {
+        let key = (chat_id, uid);
+        if let Some(&l) = lock.user_langs.get(&key) {
+            return l;
+        }
+    }
+    if let Some(&l) = lock.chat_langs.get(&chat_id) {
+        return l;
+    }
+    drop(lock);
+    if let Some(lang_code) = user_language_code {
+        if let Some(parsed) = parse_lang(lang_code) {
+            return parsed;
+        }
+        if lang_code.len() >= 2 {
+            let prefix = &lang_code[..2];
+            if let Some(parsed) = parse_lang(prefix) {
+                return parsed;
+            }
+        }
     }
     default
 }

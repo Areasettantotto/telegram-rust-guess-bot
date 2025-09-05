@@ -106,6 +106,8 @@ If you add a file with an unrecognized stem it will be ignored and a warning wil
 
 If you want, I can also add a validation script that checks every JSON file contains all required keys before deploy.
 
+Note: the bot will also try to infer language from the Telegram user's `language_code` (for new users). The code accepts both short tags like `en` and common locale prefixes like `en-US` (it uses the 2-letter prefix when necessary).
+
 # telegram-bot-rust
 
 Minimal Telegram bot written in Rust that implements a simple "guess the number" game per chat.
