@@ -12,5 +12,8 @@
   "lang_set_chat": "تم تعيين لغة المحادثة.",
   "lang_invalid": "استخدام غير صالح. أمثلة: `/lang en`, `/lang it`, `/lang chat en`",
   "pong": "pong",
-  "not_started_prompt": "ليس لديك لعبة نشطة بعد. استخدم /gioco"
+  "not_started_prompt": "ليس لديك لعبة نشطة بعد. استخدم /gioco",
+  "current_language_label": "اللغة الحالية:",
+  "language_name": "العربية",
+  "success_correct": "✅ تم! لقد خمّنت الرقم. اللعبة أعيدت."
 }

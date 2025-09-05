@@ -12,5 +12,8 @@
   "lang_set_chat": "Язык чата установлен.",
   "lang_invalid": "Неверное использование. Примеры: `/lang en`, `/lang it`, `/lang chat en`",
   "pong": "pong",
-  "not_started_prompt": "У тебя нет активной игры. Используй"
+  "not_started_prompt": "У тебя нет активной игры. Используй",
+  "current_language_label": "Текущий язык:",
+  "language_name": "русский",
+  "success_correct": "✅ Верно! Вы угадали. Игра сброшена."
 }

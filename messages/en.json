@@ -12,5 +12,8 @@
   "lang_set_chat": "Chat language preference was set.",
   "lang_invalid": "Invalid usage. Examples: `/lang en`, `/lang it`, `/lang chat en`",
   "pong": "pong",
-  "not_started_prompt": "You don't have an active game yet. Use /gioco to start."
+  "not_started_prompt": "You don't have an active game yet. Use /gioco to start.",
+  "current_language_label": "Current language:",
+  "language_name": "English",
+  "success_correct": "✅ Correct! You guessed it. Game reset."
 }

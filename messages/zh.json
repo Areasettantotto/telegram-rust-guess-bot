@@ -12,5 +12,8 @@
   "lang_set_chat": "已设置本聊天的语言。",
   "lang_invalid": "用法无效。示例：`/lang en`、`/lang it`、`/lang chat en`",
   "pong": "pong",
-  "not_started_prompt": "你还没有进行中的游戏。使用 /gioco 开"
+  "not_started_prompt": "你还没有进行中的游戏。使用 /gioco 开",
+  "current_language_label": "当前语言：",
+  "language_name": "中文",
+  "success_correct": "✅ 正确！你猜对了。游戏已重置。"
 }

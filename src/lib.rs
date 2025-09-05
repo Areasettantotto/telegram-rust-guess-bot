@@ -31,7 +31,7 @@ pub struct Config {
     pub max: i32,
     pub attempts: i32,
     pub lang: Lang,
-    pub messages: HashMap<Lang, Messages>,
+    pub messages: HashMap<String, Messages>,
 }
 
 pub type SharedConfig = Arc<Config>;
@@ -53,6 +53,9 @@ pub struct Messages {
     pub lang_invalid: String,
     pub pong: String,
     pub not_started_prompt: String,
+    pub current_language_label: String,
+    pub language_name: String,
+    pub success_correct: String,
 }
 
 pub fn load_messages_file(path: &str, lang: Lang) -> Messages {
@@ -70,7 +73,7 @@ pub fn load_messages_file(path: &str, lang: Lang) -> Messages {
 
 pub fn default_messages(lang: Lang) -> Messages {
     match lang {
-        Lang::En => Messages {
+    Lang::En => Messages {
             cannot_start: "I can't start a game for channels or messages without a user.".to_string(),
             cannot_guess: "I can't handle guesses without a user.".to_string(),
             game_started: "🎯 Game started for you! Guess a number between {min} and {max}. Attempts left: {attempts}\n".to_string(),
@@ -85,36 +88,18 @@ pub fn default_messages(lang: Lang) -> Messages {
             lang_invalid: "Invalid usage. Examples: `/lang en`, `/lang it`, `/lang chat en`".to_string(),
             pong: "pong".to_string(),
             not_started_prompt: "You don't have an active game yet. Use /gioco to start.".to_string(),
+            current_language_label: "Current language:".to_string(),
+            language_name: "English".to_string(),
+            success_correct: "✅ Correct! You guessed it. Game reset.".to_string(),
         },
-        Lang::It => Messages {
-            cannot_start: "Non posso avviare una partita per canali o messaggi senza utente.".to_string(),
-            cannot_guess: "Non posso gestire congetture senza un utente.".to_string(),
-            game_started: "🎯 Gioco avviato per te! Indovina un numero tra {min} e {max}. Tentativi rimasti: {attempts}\n".to_string(),
-            config: "Configurazione corrente: min = {min}, max = {max}, tentativi = {attempts}".to_string(),
-            welcome_prompt: "Ciao {name}! Usa /gioco per iniziare la tua partita personale.".to_string(),
-            no_attempts: "Nessun tentativo rimasto. Usa /gioco per ricominciare.".to_string(),
-            revealed: "❌ Hai esaurito i tentativi. Il numero era {target}. Usa /gioco per ricominciare.".to_string(),
-            too_low: "Troppo basso. Tentativi rimasti: {attempts}".to_string(),
-            too_high: "Troppo alto. Tentativi rimasti: {attempts}".to_string(),
-            lang_set_user: "La tua lingua è stata impostata.".to_string(),
-            lang_set_chat: "La lingua della chat è stata impostata.".to_string(),
-            lang_invalid: "Uso non valido. Esempi: `/lang en`, `/lang it`, `/lang chat en`".to_string(),
-            pong: "pong".to_string(),
-            not_started_prompt: "Non hai ancora una partita attiva. Usa /gioco per iniziare.".to_string(),
-        },
-        Lang::Ar => {
-            // Provide English defaults for languages that don't have bespoke defaults here
-            default_messages(Lang::En)
-        }
-        Lang::Ru => default_messages(Lang::En),
-        Lang::Zh => default_messages(Lang::En),
+    _ => default_messages(Lang::En),
     }
 }
 
 /// Load every `*.json` file from the `messages/` directory and return a map
 /// from language tag (Lang) to parsed `Messages` value. Files which fail to
 /// parse will fall back to defaults for that language.
-pub fn load_all_messages(dir: &str) -> HashMap<Lang, Messages> {
+pub fn load_all_messages(dir: &str) -> HashMap<String, Messages> {
     let mut map = HashMap::new();
     let p = Path::new(dir);
     if let Ok(entries) = p.read_dir() {
@@ -125,7 +110,7 @@ pub fn load_all_messages(dir: &str) -> HashMap<Lang, Messages> {
                     if let Some(lang) = parse_lang(stem) {
                         let path = format!("{}/{}", dir, fname);
                         let msgs = load_messages_file(&path, lang);
-                        map.insert(lang, msgs);
+                        map.insert(lang_tag(&lang).to_string(), msgs);
                     } else {
                         tracing::warn!("skipping unknown language file: {}", fname);
                     }
@@ -165,6 +150,17 @@ pub fn parse_lang(s: &str) -> Option<Lang> {
     }
 }
 
+/// Return the short tag for a Lang variant (e.g. Lang::En -> "en").
+fn lang_tag(l: &Lang) -> &'static str {
+    match l {
+        Lang::En => "en",
+        Lang::It => "it",
+        Lang::Ar => "ar",
+        Lang::Ru => "ru",
+        Lang::Zh => "zh",
+    }
+}
+
 pub fn rand_in_range(min: i32, max: i32) -> i32 {
     // Use Uniform distribution and a thread-local RNG (non-deprecated API)
     let mut rng = rand::thread_rng();
@@ -195,11 +191,12 @@ async fn handle_message(
 ) -> Result<()> {
     let lang = effective_lang(&state, msg, config.lang).await;
     // pick messages by language from the map, fall back to config.lang then to English
+    // look up messages by the language tag (strings), falling back to config.lang then to English
     let messages = config
         .messages
-        .get(&lang)
-        .or_else(|| config.messages.get(&config.lang))
-        .or_else(|| config.messages.get(&Lang::En))
+        .get(lang_tag(&lang))
+        .or_else(|| config.messages.get(lang_tag(&config.lang)))
+        .or_else(|| config.messages.get("en"))
         .expect("there should always be at least English messages available");
 
     if let Some(text) = msg.text() {
@@ -241,14 +238,28 @@ async fn handle_message(
             let parts: Vec<&str> = text.split_whitespace().collect();
             let mut lock = state.write().await;
             if parts.len() == 1 {
-                let current = match lang {
-                    Lang::En => "Current language: English (en)",
-                    Lang::It => "Lingua corrente: Italiano (it)",
-                    Lang::Ar => "اللغة الحالية: العربية (ar)",
-                    Lang::Ru => "Текущий язык: русский (ru)",
-                    Lang::Zh => "当前语言：中文 (zh)",
-                };
-                bot.send_message(msg.chat.id, current).await?;
+                // reply using a localized label and build the current language dynamically
+                // keys are language tags (String). We'll build a richer display below.
+                // Build the current language display: label + space + "Name (tag)" using the loaded Messages
+                // messages for the effective language provide `language_name` and `current_language_label`.
+                let current = format!(
+                    "{} {} ({})",
+                    messages.current_language_label,
+                    messages.language_name,
+                    lang_tag(&lang)
+                );
+                let mut reply = current;
+                reply.push_str("\n");
+                // Build the available languages display: iterate over keys but show name+tag where possible
+                let mut available_items: Vec<String> = config
+                    .messages
+                    .iter()
+                    .map(|(k, v)| format!("{} ({})", v.language_name, k))
+                    .collect();
+                available_items.sort_unstable();
+                let available = available_items.join(", ");
+                reply.push_str(&format!("Available languages: {}", available));
+                bot.send_message(msg.chat.id, reply).await?;
                 return Ok(());
             }
             if parts.len() == 2 {
@@ -324,14 +335,8 @@ async fn handle_message(
                 }
                 game.attempts_left = game.attempts_left.saturating_sub(1);
                 if guess == game.target {
-                    let success = match lang {
-                        Lang::En => "✅ Correct! You guessed it. Game reset.".to_string(),
-                        Lang::It => "✅ Esatto! Hai indovinato! Gioco resettato.".to_string(),
-                        Lang::Ar => "✅ تم! لقد خمّنت الرقم. اللعبة أعيدت.".to_string(),
-                        Lang::Ru => "✅ Верно! Вы угадали. Игра сброшена.".to_string(),
-                        Lang::Zh => "✅ 正确！你猜对了。游戏已重置。".to_string(),
-                    };
-                    bot.send_message(msg.chat.id, success).await?;
+                    bot.send_message(msg.chat.id, messages.success_correct.clone())
+                        .await?;
                     *game = GameState {
                         target: rand_in_range(config.min, config.max),
                         attempts_left: config.attempts,
@@ -400,14 +405,19 @@ pub async fn run_bot() -> Result<()> {
         messages: load_all_messages("messages"),
     };
     // Ensure at least English messages exist as a fallback
-    if !cfg.messages.contains_key(&Lang::En) {
-        cfg.messages
-            .insert(Lang::En, load_messages_file("messages/en.json", Lang::En));
+    if !cfg.messages.contains_key("en") {
+        cfg.messages.insert(
+            "en".to_string(),
+            load_messages_file("messages/en.json", Lang::En),
+        );
     }
     // Ensure default language exists in the map; if not, insert fallback
-    if !cfg.messages.contains_key(&cfg.lang) {
-        cfg.messages
-            .insert(cfg.lang, cfg.messages.get(&Lang::En).unwrap().clone());
+    let cfg_lang_tag = lang_tag(&cfg.lang).to_string();
+    if !cfg.messages.contains_key(&cfg_lang_tag) {
+        cfg.messages.insert(
+            cfg_lang_tag.clone(),
+            cfg.messages.get("en").unwrap().clone(),
+        );
     }
     let shared_config = Arc::new(cfg);
 
