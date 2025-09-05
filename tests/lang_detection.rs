@@ -29,6 +29,8 @@ fn detects_language_from_message_language_code_prefix() {
 
     let rt = Runtime::new().unwrap();
     // simulate a locale-style language_code like "en-US"; the code should accept the prefix
-    let detected = rt.block_on(async { effective_lang_from_parts(&state, Some("en-US"), Some(300), 101, Lang::It).await });
+    let detected = rt.block_on(async {
+        effective_lang_from_parts(&state, Some("en-US"), Some(300), 101, Lang::It).await
+    });
     assert_eq!(detected, Lang::En);
 }
