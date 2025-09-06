@@ -176,8 +176,22 @@ cargo test
 Create a `.env` (example):
 
 ```text
-TELOXIDE_TOKEN=YOUR_TOKEN
-DEFAULT_LANG=en
+## Game configuration
+GAME_MIN=1
+GAME_MAX=100
+GAME_ATTEMPTS=5
+
+# Default language for messages (en or it)
+DEFAULT_LANG=it
+
+# Telegram token from @BotFather
+TELOXIDE_TOKEN=123456:ABCDEF_your_token
+
+# Logging
+RUST_LOG=info
+
+# Welcome persistence TTL in seconds (optional). Default: 2592000 (30 days)
+# Use a small value for local testing, e.g. 60
 SEEN_WELCOME_TTL_SECS=2592000
 ```
 
