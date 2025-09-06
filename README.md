@@ -173,7 +173,7 @@ Run tests:
 cargo test
 ```
 
-Create a `.env` (example):
+Create the .env file from the .env.example file.
 
 ```text
 ## Game configuration
