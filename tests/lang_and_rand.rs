@@ -21,6 +21,7 @@ async fn integration_test_lang_and_rand() {
         by_user: HashMap::new(),
         user_langs: HashMap::new(),
         chat_langs: HashMap::new(),
+        seen_welcome: HashMap::new(),
     }));
 
     // insert language

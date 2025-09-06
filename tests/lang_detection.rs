@@ -10,6 +10,7 @@ fn detects_language_from_message_language_code() {
         by_user: HashMap::new(),
         user_langs: HashMap::new(),
         chat_langs: HashMap::new(),
+        seen_welcome: HashMap::new(),
     }));
 
     let rt = Runtime::new().unwrap();
@@ -25,6 +26,7 @@ fn detects_language_from_message_language_code_prefix() {
         by_user: HashMap::new(),
         user_langs: HashMap::new(),
         chat_langs: HashMap::new(),
+        seen_welcome: HashMap::new(),
     }));
 
     let rt = Runtime::new().unwrap();
