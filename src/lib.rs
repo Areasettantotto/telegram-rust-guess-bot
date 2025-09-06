@@ -2,7 +2,13 @@ use anyhow::Result;
 use dotenvy::dotenv;
 use rand::{Rng, distributions::Uniform};
 use serde::Deserialize;
-use std::{collections::HashMap, env, fs, path::Path, sync::Arc};
+use std::{
+    collections::HashMap,
+    env, fs,
+    path::Path,
+    sync::Arc,
+    time::{SystemTime, UNIX_EPOCH},
+};
 use teloxide::prelude::*;
 use tokio::sync::RwLock;
 
@@ -20,6 +26,8 @@ pub struct AppState {
     // language preferences
     pub user_langs: HashMap<(i64, u64), Lang>,
     pub chat_langs: HashMap<i64, Lang>,
+    // users already shown the welcome prompt (per chat) -> unix timestamp
+    pub seen_welcome: HashMap<String, u64>,
 }
 
 pub type SharedState = Arc<RwLock<AppState>>;
@@ -32,6 +40,7 @@ pub struct Config {
     pub attempts: i32,
     pub lang: Lang,
     pub messages: HashMap<String, Messages>,
+    pub ttl_seconds: u64,
 }
 
 pub type SharedConfig = Arc<Config>;
@@ -127,6 +136,35 @@ pub fn format_with(template: &str, pairs: &[(&str, &str)]) -> String {
         s = s.replace(&format!("{{{}}}", k), v);
     }
     s
+}
+
+fn now_unix() -> u64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs()
+}
+
+fn load_seen_welcome(path: &Path) -> HashMap<String, u64> {
+    if !path.exists() {
+        return HashMap::new();
+    }
+    match fs::read_to_string(path) {
+        Ok(s) => match serde_json::from_str::<HashMap<String, u64>>(&s) {
+            Ok(m) => m,
+            Err(_) => HashMap::new(),
+        },
+        Err(_) => HashMap::new(),
+    }
+}
+
+fn save_seen_welcome(path: &Path, map: &HashMap<String, u64>) {
+    if let Some(parent) = path.parent() {
+        let _ = std::fs::create_dir_all(parent);
+    }
+    if let Ok(s) = serde_json::to_string_pretty(map) {
+        let _ = fs::write(path, s);
+    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -359,10 +397,21 @@ async fn handle_message(
             let has_game = lock_read.by_user.contains_key(&key);
             drop(lock_read);
             if !has_game && !text.starts_with('/') && text.parse::<i32>().is_err() {
-                let name = user.first_name.clone();
-                let reply = format_with(&messages.welcome_prompt, &[("name", &name)]);
-                bot.send_message(msg.chat.id, reply).await?;
-                return Ok(());
+                // persisted welcome: key is "chat:user" string
+                let composite = format!("{}:{}", msg.chat.id.0, user.id.0);
+                let mut lock = state.write().await;
+                let seen_ts = lock.seen_welcome.get(&composite).copied().unwrap_or(0);
+                let now = now_unix();
+                if seen_ts == 0 || now.saturating_sub(seen_ts) > config.ttl_seconds {
+                    let name = user.first_name.clone();
+                    let reply = format_with(&messages.welcome_prompt, &[("name", name.as_str())]);
+                    bot.send_message(msg.chat.id, reply).await?;
+                    lock.seen_welcome.insert(composite.clone(), now);
+                    // persist to disk; visible path used in run_bot
+                    let data_path = Path::new("data").join("seen_welcome.json");
+                    let _ = save_seen_welcome(&data_path, &lock.seen_welcome);
+                    return Ok(());
+                }
             }
         }
 
@@ -422,6 +471,44 @@ async fn handle_message(
     Ok(())
 }
 
+#[cfg(test)]
+mod ttl_tests {
+    use super::*;
+    use std::collections::HashMap;
+    use std::fs;
+
+    #[test]
+    fn seen_welcome_ttl_renewal() {
+        // temp file path
+        let tmp = std::env::temp_dir().join(format!("seen_welcome_test_{}.json", now_unix()));
+        let key = "123:456".to_string();
+        // create a timestamp older than ttl (120s ago)
+        let old_ts = now_unix().saturating_sub(120);
+        let mut m = HashMap::new();
+        m.insert(key.clone(), old_ts);
+        // save and load
+        save_seen_welcome(&tmp, &m);
+        let loaded = load_seen_welcome(&tmp);
+        assert_eq!(loaded.get(&key).copied().unwrap(), old_ts);
+
+        // simulate ttl = 60s -> should be considered expired and renewed
+        let ttl = 60u64;
+        let now = now_unix();
+        if now.saturating_sub(old_ts) > ttl {
+            let mut new = loaded.clone();
+            new.insert(key.clone(), now);
+            save_seen_welcome(&tmp, &new);
+        }
+
+        let reloaded = load_seen_welcome(&tmp);
+        let renewed_ts = reloaded.get(&key).copied().unwrap();
+        // renewed_ts should be >= now
+        assert!(renewed_ts >= now);
+
+        let _ = fs::remove_file(&tmp);
+    }
+}
+
 /// Run the bot (previously in main). Separated so binaries can call this and
 /// tests/integration can import the library.
 pub async fn run_bot() -> Result<()> {
@@ -453,6 +540,10 @@ pub async fn run_bot() -> Result<()> {
             .unwrap_or(5),
         lang: default_lang,
         messages: load_all_messages("messages"),
+        ttl_seconds: env::var("SEEN_WELCOME_TTL_SECS")
+            .ok()
+            .and_then(|v| v.parse().ok())
+            .unwrap_or(60 * 60 * 24 * 30),
     };
     // Ensure at least English messages exist as a fallback
     if !cfg.messages.contains_key("en") {
@@ -485,10 +576,16 @@ pub async fn run_bot() -> Result<()> {
         );
     }
 
+    // load persisted seen_welcome map
+    let data_dir = Path::new("data");
+    let seen_path = data_dir.join("seen_welcome.json");
+    let seen_welcome = load_seen_welcome(&seen_path);
+
     let state = Arc::new(RwLock::new(AppState {
         by_user: HashMap::new(),
         user_langs: HashMap::new(),
         chat_langs: HashMap::new(),
+        seen_welcome,
     }));
 
     teloxide::repl(bot, move |bot: Bot, msg: Message| {

@@ -80,6 +80,17 @@ Run all tests:
 cargo test -q
 ```
 
+Welcome persistence and tests
+-----------------------------
+
+The bot now persists which users have already been shown the welcome prompt so the message is shown only once per user (per chat) unless the stored timestamp expires. Implementation details:
+
+- Persistence file: `data/seen_welcome.json` (simple JSON map of `"chat_id:user_id" -> unix_ts`).
+- TTL: 30 days (default). You can override the TTL by setting the environment variable `SEEN_WELCOME_TTL_SECS` to the number of seconds to keep the welcome record (for example `86400` for 1 day). When the timestamp for a given user is older than the TTL the welcome can be shown again and the timestamp refreshed.
+- Behavior on disk errors: the bot falls back to in-memory behavior so it remains available even if the file cannot be read or written.
+
+Tests were updated to reflect the new `AppState` layout. Unit and integration tests in `tests/` initialize `seen_welcome` as an empty map when constructing `AppState`.
+
 ## Running the bot (development)
 
 Set the environment variables (for example via a `.env` file) before starting the bot:
@@ -87,6 +98,7 @@ Set the environment variables (for example via a `.env` file) before starting th
 - `TELOXIDE_TOKEN` — your Telegram bot token
 - `GAME_MIN`, `GAME_MAX`, `GAME_ATTEMPTS` — game parameters (optional)
 - `DEFAULT_LANG` — default language (`en` or `it` are currently recognized as defaults)
+- `SEEN_WELCOME_TTL_SECS` — optional: override welcome persistence TTL in seconds (default: 2592000 = 30 days)
 
 Start the bot locally:
 
@@ -133,6 +145,12 @@ Option A — `.env` file (recommended for development):
 TELOXIDE_TOKEN=123456:ABC-DEF1234ghIkl-zyx57W2v1u123ew11
 ```
 
+Add optional TTL override (seconds):
+
+```text
+SEEN_WELCOME_TTL_SECS=2592000
+```
+
 You can also configure the game using the following optional environment variables:
 
 ```text
@@ -144,6 +162,8 @@ GAME_MAX=100
 GAME_ATTEMPTS=5
 # Default language for bot messages: 'en' or 'it' (default: en)
 DEFAULT_LANG=en
+# Welcome TTL in seconds (optional). Default: 2592000 (30 days)
+SEEN_WELCOME_TTL_SECS=2592000
 ```
 
 Option B — export in your shell:
@@ -258,6 +278,7 @@ Notes:
 
 ## Structure & logic
 - Game state is kept in-memory per user per chat in `SharedState` (non-persistent).
+- Welcome prompts are persisted to disk in `data/seen_welcome.json` with a 30-day TTL so users see the welcome message only once per chat unless the TTL expires.
 - The `rand_in_range` function uses the `rand` crate to sample the target number.
 
 ## Contributing
