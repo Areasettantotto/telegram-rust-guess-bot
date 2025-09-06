@@ -3,7 +3,7 @@
   "cannot_guess": "I can't handle guesses without a user.",
   "game_started": "🎯 Game started for you! Guess a number between {min} and {max}. Attempts left: {attempts}\n",
   "config": "Current configuration: min = {min}, max = {max}, attempts = {attempts}",
-  "welcome_prompt": "Hi {name}! Use /gioco to start your personal game.",
+  "welcome_prompt": "Hi {name}! Use /gioco to start your personal game!",
   "no_attempts": "No attempts left. Use /gioco to restart.",
   "revealed": "❌ You've run out of attempts. The number was {target}. Use /gioco to restart.",
   "too_low": "Too low. Attempts left: {attempts}",

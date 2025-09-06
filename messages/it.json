@@ -3,7 +3,7 @@
   "cannot_guess": "Non posso gestire congetture senza un utente.",
   "game_started": "🎯 Gioco avviato per te! Indovina un numero tra {min} e {max}. Tentativi rimasti: {attempts}\n",
   "config": "Configurazione corrente: min = {min}, max = {max}, tentativi = {attempts}",
-  "welcome_prompt": "Ciao {name}! Usa /gioco per iniziare la tua partita personale.",
+  "welcome_prompt": "Ciao {name}! Usa /gioco per iniziare la tua partita personale!",
   "no_attempts": "Nessun tentativo rimasto. Usa /gioco per ricominciare.",
   "revealed": "❌ Hai esaurito i tentativi. Il numero era {target}. Usa /gioco per ricominciare.",
   "too_low": "Troppo basso. Tentativi rimasti: {attempts}",
