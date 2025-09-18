@@ -1,25 +1,25 @@
 #!/bin/bash
-# Script per proteggere i file sensibili del bot Telegram
-# Imposta proprietà e permessi sicuri per messages/ e data/
+# Script to protect sensitive files of the Telegram bot
+# Set ownership and secure permissions for messages/ and data/
 
 BOT_USER="telegrambot"
 BOT_DIR="/opt/telegram-bot"
 
-# 1. Controllo che la cartella esista
+# 1. Check that the directory exists
 if [ ! -d "$BOT_DIR" ]; then
   echo "❌ Cartella $BOT_DIR non trovata"
   exit 1
 fi
 
-# 2. Imposta proprietà al bot
+# 2. Set ownership to the bot
 echo "🔹 Imposto proprietà di $BOT_USER su messages/ e data/..."
 chown -R "$BOT_USER":"$BOT_USER" "$BOT_DIR/messages" "$BOT_DIR/data"
 
-# 3. Imposta permessi sicuri
+# 3. Set secure permissions
 echo "🔹 Imposto permessi sicuri sui file JSON..."
-chmod 640 "$BOT_DIR/messages/"*.json        # solo lettura bot
-chmod 660 "$BOT_DIR/data/seen_welcome.json" # lettura/scrittura bot
-chmod 750 "$BOT_DIR/data"                    # cartella accessibile solo a bot
+chmod 640 "$BOT_DIR/messages/"*.json          # read-only for bot
+chmod 660 "$BOT_DIR/data/seen_welcome.json"   # read/write for bot
+chmod 750 "$BOT_DIR/data"                     # directory accessible only to the bot
 
 # 4. Verifica finale
 echo "🔹 Permessi correnti:"

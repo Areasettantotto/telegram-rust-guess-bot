@@ -1,6 +1,6 @@
 #!/bin/bash
 # /opt/telegram-bot/check-messages.sh
-# Controllo sicurezza file messages/*.json (dimensione e chiavi obbligatorie)
+# Security check for messages/*.json files (size and required keys)
 
 MSG_DIR="/opt/telegram-bot/messages"
 MAX_SIZE=65536  # 64 KiB
@@ -13,14 +13,14 @@ for f in "$MSG_DIR"/*.json; do
         continue
     fi
 
-    # Controllo dimensione
+    # Size check
     size=$(stat -c%s "$f")
     if [ "$size" -gt "$MAX_SIZE" ]; then
         echo "❌ $f troppo grande ($size bytes)"
         exit 1
     fi
 
-    # Controllo chiavi obbligatorie
+    # Check required keys
     for key in "${REQUIRED_KEYS[@]}"; do
         if ! jq -e --arg key "$key" 'has($key)' "$f" >/dev/null; then
             echo "❌ $f manca chiave obbligatoria: $key"

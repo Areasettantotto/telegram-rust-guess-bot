@@ -3,7 +3,7 @@ use dotenvy::dotenv;
 use rand::{Rng, distributions::Uniform};
 use serde::Deserialize;
 use std::{
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     env, fs,
     path::Path,
     sync::Arc,
@@ -53,6 +53,8 @@ pub struct Config {
     pub messages: HashMap<String, Messages>,
     pub ttl_seconds: u64,
     pub bot_owner_id: Option<u64>,
+    // set of "chat:user" strings allowed to call /reset_starts (from RESET_USER_STARTS)
+    pub reset_user_starts: HashSet<String>,
 }
 
 pub type SharedConfig = Arc<Config>;
@@ -80,6 +82,7 @@ pub struct Messages {
     pub success_correct: String,
 }
 
+/// Load a Messages struct from a given JSON file path, falling back to defaults
 pub fn load_messages_file(path: &str, lang: Lang) -> Messages {
     match fs::read_to_string(path) {
         Ok(s) => serde_json::from_str(&s).unwrap_or_else(|e| {
@@ -93,6 +96,7 @@ pub fn load_messages_file(path: &str, lang: Lang) -> Messages {
     }
 }
 
+/// Return default Messages for a given language; currently only English is supported.
 pub fn default_messages(lang: Lang) -> Messages {
     match lang {
     Lang::En => Messages {
@@ -144,6 +148,7 @@ pub fn load_all_messages(dir: &str) -> HashMap<String, Messages> {
     map
 }
 
+/// Simple template formatter: replace `{key}` with `value` for each pair in `pairs`.
 pub fn format_with(template: &str, pairs: &[(&str, &str)]) -> String {
     let mut s = template.to_string();
     for (k, v) in pairs {
@@ -152,6 +157,7 @@ pub fn format_with(template: &str, pairs: &[(&str, &str)]) -> String {
     s
 }
 
+/// Return the current unix timestamp in seconds
 fn now_unix() -> u64 {
     SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -159,6 +165,7 @@ fn now_unix() -> u64 {
         .as_secs()
 }
 
+/// Persisted seen welcome map helpers
 fn load_seen_welcome(path: &Path) -> HashMap<String, u64> {
     if !path.exists() {
         return HashMap::new();
@@ -172,6 +179,7 @@ fn load_seen_welcome(path: &Path) -> HashMap<String, u64> {
     }
 }
 
+/// Save the seen_welcome map to the given path as pretty JSON
 fn save_seen_welcome(path: &Path, map: &HashMap<String, u64>) {
     if let Some(parent) = path.parent() {
         let _ = std::fs::create_dir_all(parent);
@@ -181,7 +189,7 @@ fn save_seen_welcome(path: &Path, map: &HashMap<String, u64>) {
     }
 }
 
-// Persisted per-user start attempts map helpers
+/// Persisted per-user start attempts map helpers
 fn load_user_start_attempts(path: &Path) -> HashMap<String, i32> {
     if !path.exists() {
         return HashMap::new();
@@ -195,6 +203,7 @@ fn load_user_start_attempts(path: &Path) -> HashMap<String, i32> {
     }
 }
 
+/// Save the user_start_attempts map to the given path as pretty JSON
 fn save_user_start_attempts(path: &Path, map: &HashMap<String, i32>) {
     if let Some(parent) = path.parent() {
         let _ = std::fs::create_dir_all(parent);
@@ -204,7 +213,7 @@ fn save_user_start_attempts(path: &Path, map: &HashMap<String, i32>) {
     }
 }
 
-// Persisted per-user miss streaks helpers
+/// Persisted per-user miss streaks helpers
 fn load_user_miss_streaks(path: &Path) -> HashMap<String, i32> {
     if !path.exists() {
         return HashMap::new();
@@ -218,6 +227,7 @@ fn load_user_miss_streaks(path: &Path) -> HashMap<String, i32> {
     }
 }
 
+/// Save the user_miss_streaks map to the given path as pretty JSON
 fn save_user_miss_streaks(path: &Path, map: &HashMap<String, i32>) {
     if let Some(parent) = path.parent() {
         let _ = std::fs::create_dir_all(parent);
@@ -227,6 +237,7 @@ fn save_user_miss_streaks(path: &Path, map: &HashMap<String, i32>) {
     }
 }
 
+/// Supported languages
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum Lang {
     En,
@@ -259,6 +270,7 @@ fn lang_tag(l: &Lang) -> &'static str {
     }
 }
 
+/// Return a random integer in the inclusive range [min, max].
 pub fn rand_in_range(min: i32, max: i32) -> i32 {
     // Use Uniform distribution and a thread-local RNG (non-deprecated API)
     let mut rng = rand::thread_rng();
@@ -279,6 +291,7 @@ pub fn next_attempts_after_win(
     std::cmp::max(1, previous_start_attempts - 1)
 }
 
+/// Determine the effective language for a message, given the shared state
 pub async fn effective_lang(state: &SharedState, msg: &Message, default: Lang) -> Lang {
     let chat_id = msg.chat.id.0;
     let lock = state.read().await;
@@ -344,6 +357,7 @@ pub async fn effective_lang_from_parts(
     default
 }
 
+/// Handle an incoming message, updating state as needed and sending replies.
 async fn handle_message(
     bot: &Bot,
     msg: &Message,
@@ -363,13 +377,13 @@ async fn handle_message(
     if let Some(text) = msg.text() {
         let text = text.trim();
         if text.eq_ignore_ascii_case("/reset_starts") {
-            // only allow if BOT_OWNER_ID matches the sender (if configured)
+            // only allow if BOT_OWNER_ID matches the sender (if configured) or
+            // if the composite "chat:user" is present in RESET_USER_STARTS
             let allowed = if let Some(user) = msg.from.as_ref() {
-                if let Some(owner) = config.bot_owner_id {
-                    user.id.0 == owner
-                } else {
-                    false
-                }
+                let is_owner = config.bot_owner_id.map(|o| user.id.0 == o).unwrap_or(false);
+                let composite = format!("{}:{}", msg.chat.id.0, user.id.0);
+                let in_reset_list = config.reset_user_starts.contains(&composite);
+                is_owner || in_reset_list
             } else {
                 false
             };
@@ -629,6 +643,7 @@ async fn handle_message(
     Ok(())
 }
 
+/// Main bot runner: load config, state, and start polling
 #[cfg(test)]
 mod ttl_tests {
     use super::*;
@@ -861,6 +876,15 @@ pub async fn run_bot() -> Result<()> {
             .and_then(|v| v.parse().ok())
             .unwrap_or(60 * 60 * 24 * 30),
         bot_owner_id: env::var("BOT_OWNER_ID").ok().and_then(|v| v.parse().ok()),
+        reset_user_starts: env::var("RESET_USER_STARTS")
+            .ok()
+            .map(|s| {
+                s.split(',')
+                    .map(|p| p.trim().trim_matches('"').to_string())
+                    .filter(|p| !p.is_empty())
+                    .collect::<HashSet<String>>()
+            })
+            .unwrap_or_default(),
     };
     // Ensure at least English messages exist as a fallback
     if !cfg.messages.contains_key("en") {
