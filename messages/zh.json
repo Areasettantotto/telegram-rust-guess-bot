@@ -16,5 +16,5 @@
   "current_language_label": "当前语言：",
   "language_name": "中文",
   "reset_starts_ok": "用户的初始设置已重置。请使用 /gioco 重新开始。",
-  "success_correct": "✅ 正确！你猜对了。游戏已重置。你的下一局将有 {next_attempts} 次尝试获胜。"
+  "success_correct": "✅ 正确！你猜对了！继续游戏。你的下一局将有 {next_attempts} 次尝试获胜。"
 }

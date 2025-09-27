@@ -16,5 +16,5 @@
   "current_language_label": "Lingua corrente:",
   "language_name": "Italiano",
   "reset_starts_ok": "Le impostazioni di partenza per utente sono state azzerate. Usa /gioco per ricominciare.",
-  "success_correct": "✅ Esatto! Hai indovinato! Gioco resettato. La tua nuova partita avrà {next_attempts} tentativi per vincere."
+  "success_correct": "✅ Esatto! Hai indovinato! Prosegui il gioco La tua nuova partita avrà {next_attempts} tentativi per vincere."
 }
