@@ -16,5 +16,5 @@
   "current_language_label": "当前语言：",
   "language_name": "中文",
   "reset_starts_ok": "用户的初始设置已重置。请使用 /gioco 重新开始。",
-  "success_correct": "✅ 正确!! 你猜对了! 继续游戏，你的新游戏将有 {next_attempts} 次尝试获胜 (比上一局少 1 次)。"
+  "success_correct": "✅ 你在 {max} 次尝试内猜对了!! 在下一个级别中，你将有 {next_attempts} 次尝试进入新的难度级别（始终少 1 次尝试!!）。你在每个难度级别最多可以失败 3 次。"
 }
