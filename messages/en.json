@@ -16,5 +16,5 @@
   "current_language_label": "Current language:",
   "language_name": "English",
   "reset_starts_ok": "User's starting settings have been reset. Use /gioco to start again.",
-  "success_correct": "✅ Correct! You guessed it. Continue the game. Your next game will have {next_attempts} attempts to win."
+  "success_correct": "✅ Correct!! You guessed it! Keep playing, your new game will have {next_attempts} attempts to win (1 less than the previous game)."
 }
