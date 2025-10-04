@@ -583,14 +583,14 @@ async fn handle_message(
                         next_attempts
                     );
                     // format success message with next_attempts and number_attempts placeholders
-                    // Show `number_attempts` value (config.attempts) where the
-                    // template currently uses `{next_attempts}` so the player
-                    // sees the intended number-of-possibilities value.
+                    // Fill placeholders correctly:
+                    // - `{next_attempts}` = computed next_attempts (e.g. GAME_ATTEMPTS - 1)
+                    // - `{number_attempts}` = restart threshold (NUMBER_ATTEMPTS)
                     let success_msg = format_with(
                         &messages.success_correct,
                         &[
-                            ("next_attempts", &config.attempts.to_string()),
-                            ("number_attempts", &config.attempts.to_string()),
+                            ("next_attempts", &next_attempts.to_string()),
+                            ("number_attempts", &config.restart_threshold.to_string()),
                         ],
                     );
                     bot.send_message(msg.chat.id, success_msg).await?;
