@@ -5,7 +5,7 @@
   "config": "Configurazione corrente: min = {min}, max = {max}, tentativi = {attempts}",
   "welcome_prompt": "Ciao {name}! Usa /gioco per iniziare la tua partita personale, /config per vedere le impostazioni attuali o /lang per vedere le lingue disponibili. Imposta la tua lingua con /lang it, /lang en, /lang ru, /lang zh o /lang ar.",
   "no_attempts": "Nessun tentativo rimasto. Usa /gioco per ricominciare.",
-  "revealed": "❌ Hai esaurito i tentativi. Il numero era {target}. Usa /gioco per ricominciare.",
+  "revealed": "❌ Hai esaurito i tentativi. Il numero era {target}. Usa /gioco per ricominciare. Hai altri {number_attempts} tentativi prima di fallire e ricominciare da capo.",
   "too_low": "Troppo basso. Tentativi rimasti: {attempts}",
   "too_high": "Troppo alto. Tentativi rimasti: {attempts}",
   "lang_set_user": "La tua lingua è stata impostata.",
