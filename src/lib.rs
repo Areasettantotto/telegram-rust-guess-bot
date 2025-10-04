@@ -551,13 +551,19 @@ async fn handle_message(
                 }
             };
             let key = (msg.chat.id.0, user_id);
-            if let Some(game) = lock.by_user.get_mut(&key) {
+            if let Some(mut game) = lock.by_user.remove(&key) {
+                // check if no attempts left before decrement
                 if game.attempts_left == 0 {
+                    // reinsert and notify
+                    lock.by_user.insert(key, game);
                     bot.send_message(msg.chat.id, messages.no_attempts.clone())
                         .await?;
                     return Ok(());
                 }
+
+                // decrement owned game attempts
                 game.attempts_left = game.attempts_left.saturating_sub(1);
+
                 if guess == game.target {
                     // compute attempts for the next game depending on how fast
                     // the user succeeded. Note: `game.attempts_left` has
@@ -569,7 +575,7 @@ async fn handle_message(
                         config.restart_threshold,
                     );
                     tracing::info!(
-                        "win: chat={} user={} prev_start={} remaining_after_guess={} next={}",
+                        "win: chat={} user={} prev_start={} remaining_after_guess={} next= {}",
                         msg.chat.id.0,
                         user_id,
                         game.start_attempts,
@@ -581,58 +587,85 @@ async fn handle_message(
                         &messages.success_correct,
                         &[
                             ("next_attempts", &next_attempts.to_string()),
-                            ("number_attempts", &config.restart_threshold.to_string()),
+                            ("number_attempts", &config.attempts.to_string()),
                         ],
                     );
                     bot.send_message(msg.chat.id, success_msg).await?;
-                    *game = GameState {
+
+                    // reset game to next_attempts
+                    game = GameState {
                         target: rand_in_range(config.min, config.max),
                         attempts_left: next_attempts,
                         start_attempts: next_attempts,
                     };
-                    // reset miss streak on a win
+
+                    // reset miss streak on a win and persist
                     let composite = format!("{}:{}", msg.chat.id.0, user_id);
                     lock.user_miss_streaks.insert(composite.clone(), 0);
-                    // persist the new start_attempts and miss streak
                     lock.user_start_attempts
                         .insert(composite.clone(), next_attempts);
+                    // clone maps for persisting
+                    let starts_clone = lock.user_start_attempts.clone();
+                    let misses_clone = lock.user_miss_streaks.clone();
+                    // reinsert updated game then drop lock to persist
+                    lock.by_user.insert(key, game);
+                    drop(lock);
                     let data_path = Path::new("data").join("user_start_attempts.json");
-                    let _ = save_user_start_attempts(&data_path, &lock.user_start_attempts);
+                    let _ = save_user_start_attempts(&data_path, &starts_clone);
                     let miss_path = Path::new("data").join("user_miss_streaks.json");
-                    let _ = save_user_miss_streaks(&miss_path, &lock.user_miss_streaks);
+                    let _ = save_user_miss_streaks(&miss_path, &misses_clone);
                 } else {
                     if game.attempts_left == 0 {
-                        let reply = format_with(
-                            &messages.revealed,
-                            &[("target", &game.target.to_string())],
-                        );
-                        bot.send_message(msg.chat.id, reply).await?;
                         // user ran out of attempts -> increment miss streak and persist
                         let composite = format!("{}:{}", msg.chat.id.0, user_id);
                         let streak =
                             lock.user_miss_streaks.get(&composite).copied().unwrap_or(0) + 1;
                         lock.user_miss_streaks.insert(composite.clone(), streak);
-                        // if streak reached restart_threshold, reset start_attempts to default and clear streak
                         if streak >= config.restart_threshold {
                             lock.user_start_attempts
                                 .insert(composite.clone(), config.attempts);
                             lock.user_miss_streaks.insert(composite.clone(), 0);
                         }
+                        let starts_clone = lock.user_start_attempts.clone();
+                        let misses_clone = lock.user_miss_streaks.clone();
+                        // capture target before moving game back into the map
+                        let revealed_target = game.target;
+                        // reinsert game (with attempts_left == 0)
+                        lock.by_user.insert(key, game);
+                        drop(lock);
                         let data_path = Path::new("data").join("user_start_attempts.json");
-                        let _ = save_user_start_attempts(&data_path, &lock.user_start_attempts);
+                        let _ = save_user_start_attempts(&data_path, &starts_clone);
                         let miss_path = Path::new("data").join("user_miss_streaks.json");
-                        let _ = save_user_miss_streaks(&miss_path, &lock.user_miss_streaks);
+                        let _ = save_user_miss_streaks(&miss_path, &misses_clone);
+
+                        let remaining_before_reset = if streak >= config.restart_threshold {
+                            0
+                        } else {
+                            config.restart_threshold - streak
+                        };
+                        let reply = format_with(
+                            &messages.revealed,
+                            &[
+                                ("target", &revealed_target.to_string()),
+                                ("number_attempts", &remaining_before_reset.to_string()),
+                            ],
+                        );
+                        bot.send_message(msg.chat.id, reply).await?;
                     } else if guess < game.target {
                         let reply = format_with(
                             &messages.too_low,
                             &[("attempts", &game.attempts_left.to_string())],
                         );
+                        // reinsert game
+                        lock.by_user.insert(key, game);
                         bot.send_message(msg.chat.id, reply).await?;
                     } else {
                         let reply = format_with(
                             &messages.too_high,
                             &[("attempts", &game.attempts_left.to_string())],
                         );
+                        // reinsert game
+                        lock.by_user.insert(key, game);
                         bot.send_message(msg.chat.id, reply).await?;
                     }
                 }

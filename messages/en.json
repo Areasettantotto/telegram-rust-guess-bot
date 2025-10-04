@@ -5,7 +5,7 @@
   "config": "Current configuration: min = {min}, max = {max}, attempts = {attempts}",
   "welcome_prompt": "Hi {name}! Use /gioco to start your personal game, /config to see the current settings, or /lang to see available languages. Set your language with /lang it, /lang en, /lang ru, /lang zh or /lang ar.",
   "no_attempts": "No attempts left. Use /gioco to restart.",
-  "revealed": "❌ You've run out of attempts. The number was {target}. Use /gioco to restart. You have {number_attempts} attempts left before failing and starting over.",
+  "revealed": "❌ You've run out of attempts. The number was {target}. Use /gioco to restart. You have {number_attempts} possibilities left before failing and starting over.",
   "too_low": "Too low. Attempts left: {attempts}",
   "too_high": "Too high. Attempts left: {attempts}",
   "lang_set_user": "Your language preference was set.",
@@ -16,5 +16,5 @@
   "current_language_label": "Current language:",
   "language_name": "English",
   "reset_starts_ok": "User's starting settings have been reset. Use /gioco to start again.",
-  "success_correct": "✅ You guessed it!! Guess a new random number in {next_attempts} attempts. You will have {number_attempts} attempts before failing and starting over."
+  "success_correct": "✅ You guessed it!! Guess a new random number in {next_attempts} attempts. You will have {number_attempts} possibilities before failing and starting over."
 }
