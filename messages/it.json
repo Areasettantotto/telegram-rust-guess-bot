@@ -1,7 +1,7 @@
 {
   "cannot_start": "Non posso avviare una partita per canali o messaggi senza utente.",
   "cannot_guess": "Non posso gestire congetture senza un utente.",
-  "game_started": "🎯 Gioco avviato per te! Indovina un numero tra {min} e {max}. Tentativi rimasti: {attempts}\n",
+  "game_started": "🎯 Gioco avviato per te! Indovina un numero tra {min} e {max}. Tentativi rimasti: {attempts}",
   "config": "Configurazione corrente: min = {min}, max = {max}, tentativi = {attempts}",
   "welcome_prompt": "Ciao {name}! Usa /gioco per iniziare la tua partita personale, /config per vedere le impostazioni attuali o /lang per vedere le lingue disponibili. Imposta la tua lingua con /lang it, /lang en, /lang ru, /lang zh o /lang ar.",
   "no_attempts": "Nessun tentativo rimasto. Usa /gioco per ricominciare.",
@@ -16,5 +16,5 @@
   "current_language_label": "Lingua corrente:",
   "language_name": "Italiano",
   "reset_starts_ok": "Le impostazioni di partenza per utente sono state azzerate. Usa /gioco per ricominciare.",
-  "success_correct": "✅ Hai indovinato!! Nel livello successivo avrai {next_attempts} tentativi per passare ad un nuovo livello di difficoltà (sempre 1 tentativo in meno!!)."
+  "success_correct": "✅ Hai indovinato!! Indovina un nuovo numero casuale in {next_attempts} tentativi. Avrai {number_attempts} tentativi prima di fallire e ricominciare da capo."
 }

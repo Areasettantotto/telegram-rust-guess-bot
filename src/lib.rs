@@ -117,7 +117,7 @@ pub fn default_messages(lang: Lang) -> Messages {
             current_language_label: "Current language:".to_string(),
             language_name: "English".to_string(),
             reset_starts_ok: "Persisted per-user start attempts cleared.".to_string(),
-            success_correct: "✅ Correct! You guessed it. Game reset. Your next game will have {next_attempts} attempts to win.".to_string(),
+            success_correct: "✅ You guessed it!! Guess a new random number in {next_attempts} attempts. You will have {number_attempts} attempts before failing and starting over.".to_string(),
         },
     _ => default_messages(Lang::En),
     }
@@ -576,10 +576,13 @@ async fn handle_message(
                         game.attempts_left,
                         next_attempts
                     );
-                    // format success message with next_attempts placeholder
+                    // format success message with next_attempts and number_attempts placeholders
                     let success_msg = format_with(
                         &messages.success_correct,
-                        &[("next_attempts", &next_attempts.to_string())],
+                        &[
+                            ("next_attempts", &next_attempts.to_string()),
+                            ("number_attempts", &config.restart_threshold.to_string()),
+                        ],
                     );
                     bot.send_message(msg.chat.id, success_msg).await?;
                     *game = GameState {

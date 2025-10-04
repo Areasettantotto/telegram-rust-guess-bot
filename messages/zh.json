@@ -1,7 +1,7 @@
 {
   "cannot_start": "无法为频道或没有用户信息的消息启动游戏。",
   "cannot_guess": "没有用户信息，无法处理猜测。",
-  "game_started": "🎯 游戏开始！请猜一个介于 {min} 与 {max} 之间的数字。剩余尝试次数：{attempts}\n",
+  "game_started": "🎯 游戏开始！请猜一个介于 {min} 与 {max} 之间的数字。剩余尝试次数：{attempts}",
   "config": "当前配置：min = {min}, max = {max}, attempts = {attempts}",
   "welcome_prompt": "你好 {name}！使用 /gioco 开始你的个人游戏，/config 查看当前设置，或 /lang 查看可用语言。你可以用 /lang it、/lang en、/lang ru、/lang zh 或 /lang ar 设置你的语言。",
   "no_attempts": "没有剩余尝试次数。使用 /gioco 重新开始。",
@@ -16,5 +16,5 @@
   "current_language_label": "当前语言：",
   "language_name": "中文",
   "reset_starts_ok": "用户的初始设置已重置。请使用 /gioco 重新开始。",
-  "success_correct": "✅ 你猜对了!! 在下一个级别，你将有 {next_attempts} 次尝试进入新的难度级别（始终少 1 次尝试!!）。你可以在每个难度级别最多失败 3 次。"
+  "success_correct": "✅ 恭喜你猜对了！请在 {next_attempts} 次尝试内猜一个新随机数字。你有 {number_attempts} 次机会，失败后将重新开始。"
 }
