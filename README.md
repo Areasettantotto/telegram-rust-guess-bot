@@ -85,11 +85,55 @@ Notes:
 
 ## Running and debugging
 
-- Start locally:
 
 ```bash
 cargo run --release
 ```
+
+## Changelog — 05 October 2025
+
+Summary of changes applied on 05 October 2025:
+
+- Placeholders and messages
+  - `success_correct` and `revealed` now support `{number_attempts}` to show the remaining chances before a reset.
+  - `{next_attempts}` now represents the maximum attempts for the current/next game (derived from the per-user `start_attempts`).
+  - `{attempts}` continues to show attempts remaining in the active game.
+
+- Commands
+  - `/config` now displays: minimum, maximum, attempts (remaining), `next_attempts` (max for the game) and `number_attempts` (remaining failures before reset).
+  - `/reset_starts` was enhanced to also clear `user_miss_streaks` so the remaining-before-reset value returns to the full threshold.
+
+- Persistence and git
+  - The `data/` directory is now ignored via `.gitignore` and was removed from version control (files remain on disk).
+  - The bot automatically creates and updates `data/user_start_attempts.json` and `data/user_miss_streaks.json` at runtime.
+
+- Tests
+  - Integration tests were added/updated in `tests/config_display.rs` to assert correct substitution for `{attempts}`, `{next_attempts}` and `{number_attempts}` using `messages/it.json`.
+
+How to verify locally
+
+1. Run the unit/integration tests:
+
+```bash
+cargo test
+```
+
+2. Build and run the bot, then interact in Telegram:
+
+```bash
+cargo run --release
+# or
+cargo build --release && ./target/release/telegram-bot-rust
+```
+
+3. Manual checks:
+- Start a game with `/gioco`, then run `/config` — observe `Tentativi rimasti` and `Numero massimo di tentativi per questa partita` (or their English equivalents).
+- Lose a game and check `/config` to see the updated `number_attempts` (remaining before reset).
+
+If you want, I can:
+- Split this changelog into individual commit references, or
+- Add an explicit section describing the JSON format of `data/*.json` or
+- Create a small `scripts/seed_data.sh` to pre-populate `data/` for testing.
 
 - Enable backtraces:
 
