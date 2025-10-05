@@ -102,22 +102,22 @@ pub fn default_messages(lang: Lang) -> Messages {
     Lang::En => Messages {
             cannot_start: "I can't start a game for channels or messages without a user.".to_string(),
             cannot_guess: "I can't handle guesses without a user.".to_string(),
-            game_started: "🎯 Game started for you! Guess a number between {min} and {max}. Attempts left: {attempts}\n".to_string(),
-            config: "Current configuration: min = {min}, max = {max}, attempts = {attempts}".to_string(),
-            welcome_prompt: "Hi {name}! Use /gioco to start your personal game.".to_string(),
+            game_started: "🎯 Game started for you! Guess a number between {min} and {max}. Attempts left: {attempts}".to_string(),
+            config: "Current configuration:\nMinimum number = {min},\nMaximum number = {max},\nAttempts to guess = {attempts},\nChances to fail = {number_attempts}".to_string(),
+            welcome_prompt: "Hi {name}! Use /gioco to start your personal game,\n/config to see the current settings,\n/lang to see available languages.\nSet your language with /lang it, /lang en, /lang ru, /lang zh or /lang ar.".to_string(),
             no_attempts: "No attempts left. Use /gioco to restart.".to_string(),
-            revealed: "❌ You've run out of attempts. The number was {target}. Use /gioco to restart.".to_string(),
+            revealed: "❌ You've run out of attempts. The number was {target}. Use /gioco to restart. You have {number_attempts} possibilities left before failing and starting over.".to_string(),
             too_low: "Too low. Attempts left: {attempts}".to_string(),
             too_high: "Too high. Attempts left: {attempts}".to_string(),
             lang_set_user: "Your language preference was set.".to_string(),
             lang_set_chat: "Chat language preference was set.".to_string(),
-            lang_invalid: "Invalid usage. Examples: `/lang en`, `/lang it`, `/lang chat en`".to_string(),
+            lang_invalid: "Invalid usage. Correct examples: `/lang en`, `/lang it`, `/lang ar`, `/lang ru`, `/lang zh`.".to_string(),
             pong: "pong".to_string(),
             not_started_prompt: "You don't have an active game yet. Use /gioco to start.".to_string(),
             current_language_label: "Current language:".to_string(),
             language_name: "English".to_string(),
-            reset_starts_ok: "Persisted per-user start attempts cleared.".to_string(),
-            success_correct: "✅ You guessed it!! Guess a new random number in {next_attempts} attempts. You will have {number_attempts} attempts before failing and starting over.".to_string(),
+            reset_starts_ok: "User's starting settings have been reset. Use /gioco to start again.".to_string(),
+            success_correct: "✅ You guessed it!! Guess a new random number in {next_attempts} attempts. You will have {number_attempts} possibilities before failing and starting over.".to_string(),
         },
     _ => default_messages(Lang::En),
     }
@@ -394,8 +394,12 @@ async fn handle_message(
             }
             let mut lock = state.write().await;
             lock.user_start_attempts.clear();
+            // also clear miss streaks so remaining-before-reset goes back to full
+            lock.user_miss_streaks.clear();
             let data_path = Path::new("data").join("user_start_attempts.json");
             let _ = save_user_start_attempts(&data_path, &lock.user_start_attempts);
+            let miss_path = Path::new("data").join("user_miss_streaks.json");
+            let _ = save_user_miss_streaks(&miss_path, &lock.user_miss_streaks);
             bot.send_message(msg.chat.id, messages.reset_starts_ok.clone())
                 .await?;
             return Ok(());
@@ -504,12 +508,38 @@ async fn handle_message(
         }
 
         if text.eq_ignore_ascii_case("/config") {
+            // Acquire read lock once and compute both attempts and remaining
+            // "number_attempts" (the remaining failures before reset) from
+            // user_miss_streaks when possible.
+            let mut attempts_str = config.attempts.to_string();
+            let mut number_attempts_s = config.restart_threshold.to_string();
+            if let Some(user) = msg.from.as_ref() {
+                let key = (msg.chat.id.0, user.id.0);
+                let composite = format!("{}:{}", msg.chat.id.0, user.id.0);
+                let lock = state.read().await;
+                if let Some(game) = lock.by_user.get(&key) {
+                    attempts_str = game.attempts_left.to_string();
+                }
+                // compute remaining before reset based on miss streak
+                let streak = lock.user_miss_streaks.get(&composite).copied().unwrap_or(0);
+                let remaining = if streak >= config.restart_threshold {
+                    0
+                } else {
+                    config.restart_threshold - streak
+                };
+                number_attempts_s = remaining.to_string();
+            }
+
+            let min_s = config.min.to_string();
+            let max_s = config.max.to_string();
+
             let reply = format_with(
                 &messages.config,
                 &[
-                    ("min", &config.min.to_string()),
-                    ("max", &config.max.to_string()),
-                    ("attempts", &config.attempts.to_string()),
+                    ("min", &min_s),
+                    ("max", &max_s),
+                    ("attempts", &attempts_str),
+                    ("number_attempts", &number_attempts_s),
                 ],
             );
             bot.send_message(msg.chat.id, reply).await?;
