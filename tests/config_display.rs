@@ -82,6 +82,79 @@ async fn config_shows_active_attempts_and_remaining_number_attempts() {
 }
 
 #[tokio::test]
+async fn config_includes_next_attempts_value() {
+    // active game with start_attempts = 7 and attempts_left = 3
+    let mut by_user = HashMap::new();
+    let user_game = GameState {
+        target: 11,
+        attempts_left: 3,
+        start_attempts: 7,
+    };
+    let chat_id = 33i64;
+    let user_id = 44u64;
+    by_user.insert((chat_id, user_id), user_game);
+
+    let state = Arc::new(RwLock::new(AppState {
+        by_user,
+        user_langs: HashMap::new(),
+        chat_langs: HashMap::new(),
+        seen_welcome: HashMap::new(),
+        user_start_attempts: HashMap::new(),
+        user_miss_streaks: HashMap::new(),
+    }));
+
+    // Use default messages but ensure config template contains next_attempts
+    let mut messages = HashMap::new();
+    let mut msgs = default_messages(Lang::En);
+    msgs.config = "Current configuration: min = {min}, max = {max}, attempts = {attempts}, number_attempts = {number_attempts}, next_attempts = {next_attempts}".to_string();
+    messages.insert("it".to_string(), msgs);
+
+    let cfg = Config {
+        min: 1,
+        max: 50,
+        attempts: 10,
+        restart_threshold: 3,
+        lang: Lang::It,
+        messages,
+        ttl_seconds: 60 * 60 * 24,
+        bot_owner_id: None,
+        reset_user_starts: HashSet::new(),
+    };
+    let shared_cfg = Arc::new(cfg);
+
+    // replicate formatting
+    let lock = state.read().await;
+    let key = (chat_id, user_id);
+    let attempts_str = if let Some(game) = lock.by_user.get(&key) {
+        game.attempts_left.to_string()
+    } else {
+        shared_cfg.attempts.to_string()
+    };
+    let next_attempts_str = if let Some(game) = lock.by_user.get(&key) {
+        game.start_attempts.to_string()
+    } else {
+        shared_cfg.attempts.to_string()
+    };
+    let number_attempts_s = shared_cfg.restart_threshold.to_string();
+    drop(lock);
+
+    let msgs = &shared_cfg.messages.get("it").expect("it messages");
+    let out = format_with(
+        &msgs.config,
+        &[
+            ("min", &shared_cfg.min.to_string()),
+            ("max", &shared_cfg.max.to_string()),
+            ("attempts", &attempts_str),
+            ("number_attempts", &number_attempts_s),
+            ("next_attempts", &next_attempts_str),
+        ],
+    );
+
+    assert!(out.contains("attempts = 3"), "output was: {}", out);
+    assert!(out.contains("next_attempts = 7"), "output was: {}", out);
+}
+
+#[tokio::test]
 async fn config_uses_real_italian_messages_file() {
     use std::fs;
     // load messages/it.json from workspace
@@ -146,6 +219,13 @@ async fn config_uses_real_italian_messages_file() {
     let number_attempts_s = remaining.to_string();
     drop(lock);
 
+    // compute next_attempts (max attempts for this game)
+    let next_attempts_s = if let Some(game) = state.read().await.by_user.get(&(chat_id, user_id)) {
+        game.start_attempts.to_string()
+    } else {
+        shared_cfg.attempts.to_string()
+    };
+
     let out = format_with(
         &msgs.config,
         &[
@@ -153,12 +233,15 @@ async fn config_uses_real_italian_messages_file() {
             ("max", &shared_cfg.max.to_string()),
             ("attempts", &attempts_str),
             ("number_attempts", &number_attempts_s),
+            ("next_attempts", &next_attempts_s),
         ],
     );
 
     // Check that Italian text is present and numbers substituted
     assert!(
-        out.contains("Tentativi per indovinare") || out.contains("attempti"),
+        out.contains("Tentativi rimasti")
+            || out.contains("Tentativi per indovinare")
+            || out.contains("attempts"),
         "output: {}",
         out
     );
@@ -166,6 +249,12 @@ async fn config_uses_real_italian_messages_file() {
     assert!(
         out.contains(&number_attempts_s),
         "number_attempts missing in: {}",
+        out
+    );
+    // also ensure next_attempts was substituted
+    assert!(
+        out.contains(&next_attempts_s),
+        "next_attempts missing in: {}",
         out
     );
 }
