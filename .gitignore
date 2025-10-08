@@ -1,4 +1,3 @@
 /target
 /terminale
 .env
-/data/*.json
