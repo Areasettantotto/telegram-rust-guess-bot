@@ -508,38 +508,50 @@ async fn handle_message(
         }
 
         if text.eq_ignore_ascii_case("/config") {
-            // Acquire read lock once and compute both attempts and remaining
-            // "number_attempts" (the remaining failures before reset) from
-            // user_miss_streaks when possible.
-            let mut attempts_str = config.attempts.to_string();
-            let mut number_attempts_s = config.restart_threshold.to_string();
-            let mut next_attempts_str = config.attempts.to_string();
-            if let Some(user) = msg.from.as_ref() {
-                let key = (msg.chat.id.0, user.id.0);
-                let composite = format!("{}:{}", msg.chat.id.0, user.id.0);
-                let lock = state.read().await;
-                if let Some(game) = lock.by_user.get(&key) {
-                    attempts_str = game.attempts_left.to_string();
-                    next_attempts_str = game.start_attempts.to_string();
-                }
-                // compute remaining before reset based on miss streak
-                let streak = lock.user_miss_streaks.get(&composite).copied().unwrap_or(0);
-                let remaining = if streak >= config.restart_threshold {
-                    0
-                } else {
-                    config.restart_threshold - streak
-                };
-                number_attempts_s = remaining.to_string();
-            }
+            // Extract data with minimal lock duration
+            let (attempts_str, next_attempts_str, number_attempts_s) =
+                if let Some(user) = msg.from.as_ref() {
+                    let key = (msg.chat.id.0, user.id.0);
+                    let composite = format!("{}:{}", msg.chat.id.0, user.id.0);
 
-            let min_s = config.min.to_string();
-            let max_s = config.max.to_string();
+                    // Acquire lock only to read necessary data, then release immediately
+                    let (game_state, streak) = {
+                        let lock = state.read().await;
+                        (
+                            lock.by_user
+                                .get(&key)
+                                .map(|g| (g.attempts_left, g.start_attempts)),
+                            lock.user_miss_streaks.get(&composite).copied().unwrap_or(0),
+                        )
+                    }; // Lock is automatically released here
+
+                    let (attempts, next_attempts) =
+                        game_state.unwrap_or((config.attempts, config.attempts));
+
+                    let remaining = if streak >= config.restart_threshold {
+                        0
+                    } else {
+                        config.restart_threshold - streak
+                    };
+
+                    (
+                        attempts.to_string(),
+                        next_attempts.to_string(),
+                        remaining.to_string(),
+                    )
+                } else {
+                    (
+                        config.attempts.to_string(),
+                        config.attempts.to_string(),
+                        config.restart_threshold.to_string(),
+                    )
+                };
 
             let reply = format_with(
                 &messages.config,
                 &[
-                    ("min", &min_s),
-                    ("max", &max_s),
+                    ("min", &config.min.to_string()),
+                    ("max", &config.max.to_string()),
                     ("attempts", &attempts_str),
                     ("number_attempts", &number_attempts_s),
                     ("next_attempts", &next_attempts_str),
@@ -646,6 +658,8 @@ async fn handle_message(
                     // reinsert updated game then drop lock to persist
                     lock.by_user.insert(key, game);
                     drop(lock);
+
+                    // Perform disk I/O operations without holding lock
                     let data_path = Path::new("data").join("user_start_attempts.json");
                     let _ = save_user_start_attempts(&data_path, &starts_clone);
                     let miss_path = Path::new("data").join("user_miss_streaks.json");
@@ -669,6 +683,8 @@ async fn handle_message(
                         // reinsert game (with attempts_left == 0)
                         lock.by_user.insert(key, game);
                         drop(lock);
+
+                        // Perform disk I/O operations without holding lock
                         let data_path = Path::new("data").join("user_start_attempts.json");
                         let _ = save_user_start_attempts(&data_path, &starts_clone);
                         let miss_path = Path::new("data").join("user_miss_streaks.json");
@@ -694,6 +710,7 @@ async fn handle_message(
                         );
                         // reinsert game
                         lock.by_user.insert(key, game);
+                        drop(lock); // Release lock before async operation
                         bot.send_message(msg.chat.id, reply).await?;
                     } else {
                         let reply = format_with(
@@ -702,6 +719,7 @@ async fn handle_message(
                         );
                         // reinsert game
                         lock.by_user.insert(key, game);
+                        drop(lock); // Release lock before async operation
                         bot.send_message(msg.chat.id, reply).await?;
                     }
                 }
